@@ -61,7 +61,8 @@ export default function EvidencePackPage() {
     try {
       const token = localStorage.getItem('eenera_token');
       const response = await fetch(
-        `${process.env.REACT_APP_BACKEND_URL}/api/reports/${selectedId}/pdf?authorization=Bearer ${token}`
+        `${process.env.REACT_APP_BACKEND_URL}/api/reports/${selectedId}/pdf`,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!response.ok) throw new Error('PDF generation failed');
       const blob = await response.blob();
