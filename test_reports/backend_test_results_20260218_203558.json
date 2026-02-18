@@ -1,0 +1,42 @@
+{
+  "timestamp": "2026-02-18T20:35:58.114331",
+  "base_url": "https://governance-engine-2.preview.emergentagent.com",
+  "total_tests": 8,
+  "passed_tests": 4,
+  "failed_tests": [
+    {
+      "name": "Get Current User",
+      "expected": 200,
+      "actual": 401,
+      "response": "{\"detail\":\"Not authenticated\"}"
+    },
+    {
+      "name": "Seed ICO/GDPR Framework",
+      "expected": 200,
+      "actual": 401,
+      "response": "{\"detail\":\"Not authenticated\"}"
+    },
+    {
+      "name": "Create Organisation",
+      "expected": 200,
+      "actual": 401,
+      "response": "{\"detail\":\"Not authenticated\"}"
+    },
+    {
+      "name": "List Organisations",
+      "expected": 200,
+      "actual": 401,
+      "response": "{\"detail\":\"Not authenticated\"}"
+    }
+  ],
+  "success_rate": 50.0,
+  "created_resources": {
+    "org_id": null,
+    "framework_id": null,
+    "version_id": null,
+    "assessment_id": null,
+    "document_id": null,
+    "gap_ids": [],
+    "task_ids": []
+  }
+}
