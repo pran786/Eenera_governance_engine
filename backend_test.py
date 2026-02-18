@@ -142,7 +142,8 @@ class EeneraAPITester:
             "POST", 
             "auth/login",
             200,
-            data={"email": test_user['email'], "password": test_user['password']}
+            data={"email": test_user['email'], "password": test_user['password']},
+            needs_auth=False
         )
         
         if success and 'token' in response:
