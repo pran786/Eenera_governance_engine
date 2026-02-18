@@ -218,7 +218,8 @@ class EeneraAPITester:
                 "List Controls",
                 "GET",
                 f"frameworks/{self.created_resources['version_id']}/controls",
-                200
+                200,
+                needs_auth=False
             )
             
             if success and response:
