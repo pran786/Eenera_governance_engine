@@ -196,7 +196,8 @@ class EeneraAPITester:
                 "List Framework Versions",
                 "GET",
                 f"frameworks/{self.created_resources['framework_id']}/versions",
-                200
+                200,
+                needs_auth=False
             )
             
         # Test list obligations
