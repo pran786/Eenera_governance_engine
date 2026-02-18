@@ -117,7 +117,7 @@ async def get_current_user(token: str = None):
     except Exception:
         return None
 
-def extract_token(authorization: str = None):
+def extract_token(authorization: str = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:
@@ -170,7 +170,7 @@ async def login(data: UserLogin):
     return {"token": token, "user": {"id": user["id"], "email": user["email"], "name": user["name"], "role": user["role"]}}
 
 @api_router.get("/auth/me")
-async def get_me(authorization: str = None):
+async def get_me(authorization: str = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Not authenticated")
     user_data = extract_token(authorization)
@@ -187,7 +187,7 @@ async def list_frameworks():
     return frameworks
 
 @api_router.post("/frameworks")
-async def create_framework(data: FrameworkCreate, authorization: str = None):
+async def create_framework(data: FrameworkCreate, authorization: str = Header(None)):
     user = extract_token(authorization)
     fw_id = str(uuid.uuid4())
     fw = {
@@ -207,7 +207,7 @@ async def list_versions(framework_id: str):
     return versions
 
 @api_router.post("/frameworks/{framework_id}/versions")
-async def create_version(framework_id: str, data: VersionCreate, authorization: str = None):
+async def create_version(framework_id: str, data: VersionCreate, authorization: str = Header(None)):
     user = extract_token(authorization)
     ver_id = str(uuid.uuid4())
     ver = {
@@ -232,7 +232,7 @@ async def list_controls(version_id: str):
     return controls
 
 @api_router.post("/frameworks/import-csv")
-async def import_csv(file: UploadFile = File(...), framework_id: str = "", version: str = "1.0", authorization: str = None):
+async def import_csv(file: UploadFile = File(...), framework_id: str = "", version: str = "1.0", authorization: str = Header(None)):
     user = extract_token(authorization)
     content = await file.read()
     text = content.decode("utf-8")
@@ -289,7 +289,7 @@ async def import_csv(file: UploadFile = File(...), framework_id: str = "", versi
 # ──────────────── SEED DATA ────────────────
 
 @api_router.post("/seed")
-async def seed_data(authorization: str = None):
+async def seed_data(authorization: str = Header(None)):
     user = extract_token(authorization)
     from seed_data import THEMES, FRAMEWORK_NAME, FRAMEWORK_DESCRIPTION, KEYWORD_MAP
 
@@ -335,13 +335,13 @@ async def seed_data(authorization: str = None):
 # ──────────────── ORGANISATION ROUTES ────────────────
 
 @api_router.get("/organisations")
-async def list_organisations(authorization: str = None):
+async def list_organisations(authorization: str = Header(None)):
     user = extract_token(authorization)
     orgs = await db.organisations.find({}, {"_id": 0}).to_list(100)
     return orgs
 
 @api_router.post("/organisations")
-async def create_organisation(data: OrgCreate, authorization: str = None):
+async def create_organisation(data: OrgCreate, authorization: str = Header(None)):
     user = extract_token(authorization)
     org_id = str(uuid.uuid4())
     org = {
@@ -376,7 +376,7 @@ def chunk_text(text: str, chunk_size: int = 500) -> list:
     return chunks
 
 @api_router.post("/documents/upload")
-async def upload_document(file: UploadFile = File(None), org_id: str = "", authorization: str = None, use_sample: bool = False):
+async def upload_document(file: UploadFile = File(None), org_id: str = "", authorization: str = Header(None), use_sample: bool = False):
     user = extract_token(authorization)
     
     if use_sample:
@@ -440,7 +440,7 @@ async def get_chunks(doc_id: str):
 # ──────────────── ASSESSMENT ROUTES ────────────────
 
 @api_router.post("/assessments")
-async def create_assessment(data: AssessmentCreate, authorization: str = None):
+async def create_assessment(data: AssessmentCreate, authorization: str = Header(None)):
     user = extract_token(authorization)
     assessment_id = str(uuid.uuid4())
     
@@ -474,7 +474,7 @@ async def create_assessment(data: AssessmentCreate, authorization: str = None):
     return {k: v for k, v in assessment.items() if k != "_id"}
 
 @api_router.get("/assessments")
-async def list_assessments(org_id: str = None, authorization: str = None):
+async def list_assessments(org_id: str = None, authorization: str = Header(None)):
     user = extract_token(authorization)
     query = {}
     if org_id:
@@ -574,7 +574,7 @@ async def get_score(assessment_id: str):
 # ──────────────── HEURISTIC + AI ANALYSIS ────────────────
 
 @api_router.post("/assessments/{assessment_id}/generate")
-async def generate_assessment(assessment_id: str, use_ai: bool = False, authorization: str = None):
+async def generate_assessment(assessment_id: str, use_ai: bool = False, authorization: str = Header(None)):
     user = extract_token(authorization)
     
     assessment = await db.assessments.find_one({"id": assessment_id}, {"_id": 0})
@@ -701,7 +701,7 @@ async def generate_assessment(assessment_id: str, use_ai: bool = False, authoriz
 # ──────────────── AI ANALYSIS (Optional) ────────────────
 
 @api_router.post("/ai/analyze")
-async def ai_analyze(assessment_id: str, authorization: str = None):
+async def ai_analyze(assessment_id: str, authorization: str = Header(None)):
     user = extract_token(authorization)
     
     assessment = await db.assessments.find_one({"id": assessment_id}, {"_id": 0})
@@ -793,7 +793,7 @@ async def list_control_assessments(assessment_id: str):
     return cas
 
 @api_router.put("/control-assessments/{ca_id}")
-async def override_control_assessment(ca_id: str, data: ControlOverride, authorization: str = None):
+async def override_control_assessment(ca_id: str, data: ControlOverride, authorization: str = Header(None)):
     user = extract_token(authorization)
     result = await db.control_assessments.update_one(
         {"id": ca_id},
@@ -812,7 +812,7 @@ async def list_gaps(assessment_id: str):
     return gaps
 
 @api_router.post("/gaps")
-async def create_gap(data: GapCreate, authorization: str = None):
+async def create_gap(data: GapCreate, authorization: str = Header(None)):
     user = extract_token(authorization)
     gap_id = str(uuid.uuid4())
     gap = {
@@ -834,7 +834,7 @@ async def list_tasks(assessment_id: str):
     return tasks
 
 @api_router.post("/tasks")
-async def create_task(data: TaskCreate, authorization: str = None):
+async def create_task(data: TaskCreate, authorization: str = Header(None)):
     user = extract_token(authorization)
     task_id = str(uuid.uuid4())
     task = {
@@ -849,7 +849,7 @@ async def create_task(data: TaskCreate, authorization: str = None):
     return {k: v for k, v in task.items() if k != "_id"}
 
 @api_router.put("/tasks/{task_id}")
-async def update_task(task_id: str, data: TaskUpdate, authorization: str = None):
+async def update_task(task_id: str, data: TaskUpdate, authorization: str = Header(None)):
     user = extract_token(authorization)
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
     if not update_data:
@@ -863,7 +863,7 @@ async def update_task(task_id: str, data: TaskUpdate, authorization: str = None)
 # ──────────────── APPROVAL ROUTES ────────────────
 
 @api_router.post("/approvals")
-async def create_approval(data: ApprovalCreate, authorization: str = None):
+async def create_approval(data: ApprovalCreate, authorization: str = Header(None)):
     user = extract_token(authorization)
     approval_id = str(uuid.uuid4())
     user_doc = await db.users.find_one({"id": user["user_id"]}, {"_id": 0, "password": 0})
