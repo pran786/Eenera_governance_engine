@@ -551,7 +551,8 @@ class EeneraAPITester:
             "List Audit Logs",
             "GET",
             "audit-logs?limit=20",
-            200
+            200,
+            needs_auth=False
         )
         
         if success and response:
