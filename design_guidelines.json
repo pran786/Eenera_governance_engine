@@ -1,0 +1,171 @@
+{
+  "design_system": {
+    "name": "Eenera Governance System",
+    "description": "Institutional SaaS dashboard aesthetic. Stripe × Palantir fusion. High density, rigorous hierarchy, clean typography.",
+    "theme_strategy": "light-mode-primary",
+    "typography": {
+      "font_family": {
+        "sans": ["Inter", "system-ui", "sans-serif"],
+        "heading": ["Plus Jakarta Sans", "Inter", "sans-serif"],
+        "mono": ["JetBrains Mono", "monospace"]
+      },
+      "font_urls": [
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      ],
+      "scale": {
+        "h1": "text-3xl font-bold tracking-tight text-primary",
+        "h2": "text-2xl font-semibold tracking-tight text-primary",
+        "h3": "text-xl font-semibold tracking-tight text-primary",
+        "body": "text-sm leading-relaxed text-slate-600",
+        "small": "text-xs font-medium text-slate-500",
+        "mono": "font-mono text-xs text-slate-700"
+      }
+    },
+    "colors": {
+      "palette": {
+        "primary": {
+          "DEFAULT": "#0B1F3B",
+          "foreground": "#FFFFFF",
+          "hover": "#162B4D"
+        },
+        "secondary": {
+          "DEFAULT": "#F4F6FA",
+          "foreground": "#0B1F3B"
+        },
+        "accent": {
+          "DEFAULT": "#1E4FFF",
+          "foreground": "#FFFFFF",
+          "light": "#EBF1FF"
+        },
+        "background": {
+          "DEFAULT": "#FFFFFF",
+          "subtle": "#F8FAFC"
+        },
+        "muted": {
+          "DEFAULT": "#F1F5F9",
+          "foreground": "#64748B"
+        },
+        "border": {
+          "DEFAULT": "#E2E8F0",
+          "strong": "#CBD5E1"
+        },
+        "status": {
+          "success": "#10B981",
+          "warning": "#F59E0B",
+          "error": "#EF4444",
+          "info": "#3B82F6"
+        }
+      },
+      "usage_rules": {
+        "gradients": "FORBIDDEN",
+        "shadows": "Minimal. use shadow-sm or shadow-md only. No large diffuse shadows.",
+        "borders": "Crisp 1px borders. Use border-slate-200 for containers."
+      }
+    },
+    "spacing": {
+      "container_padding": "p-6 md:p-8",
+      "section_gap": "gap-6",
+      "item_gap": "gap-3",
+      "radius": {
+        "default": "rounded-md",
+        "small": "rounded-sm",
+        "pill": "rounded-full"
+      }
+    },
+    "layout_strategies": {
+      "dashboard_grid": "grid grid-cols-12 gap-6",
+      "sidebar_width": "w-64",
+      "header_height": "h-14",
+      "card_style": "bg-white border border-slate-200 shadow-sm rounded-md"
+    },
+    "component_styles": {
+      "buttons": {
+        "primary": "bg-[#0B1F3B] text-white hover:bg-[#162B4D] shadow-sm rounded-md h-9 px-4 font-medium text-sm transition-all",
+        "secondary": "bg-white text-[#0B1F3B] border border-slate-200 hover:bg-slate-50 shadow-sm rounded-md h-9 px-4 font-medium text-sm transition-all",
+        "outline": "border border-[#0B1F3B] text-[#0B1F3B] hover:bg-slate-50 rounded-md h-9 px-4",
+        "ghost": "text-slate-600 hover:text-[#0B1F3B] hover:bg-slate-100 rounded-md h-9 px-4"
+      },
+      "inputs": "h-9 border-slate-200 focus:ring-2 focus:ring-[#1E4FFF] focus:border-[#1E4FFF] rounded-md text-sm",
+      "tables": {
+        "header": "bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider h-10 border-b border-slate-200",
+        "row": "h-12 border-b border-slate-100 hover:bg-slate-50/50 transition-colors text-sm text-slate-700",
+        "cell_padding": "px-4"
+      },
+      "badges": {
+        "default": "bg-slate-100 text-slate-700 border border-slate-200 rounded-full px-2.5 py-0.5 text-xs font-medium",
+        "success": "bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2.5 py-0.5 text-xs font-medium",
+        "warning": "bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-0.5 text-xs font-medium",
+        "error": "bg-red-50 text-red-700 border border-red-200 rounded-full px-2.5 py-0.5 text-xs font-medium",
+        "brand": "bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2.5 py-0.5 text-xs font-medium"
+      }
+    }
+  },
+  "visual_assets": {
+    "images": {
+      "user_avatar": {
+        "url": "https://images.pexels.com/photos/5082976/pexels-photo-5082976.jpeg?auto=compress&cs=tinysrgb&w=200",
+        "alt": "Compliance Officer Profile"
+      },
+      "evidence_placeholder": {
+        "url": "https://images.pexels.com/photos/7680681/pexels-photo-7680681.jpeg?auto=compress&cs=tinysrgb&w=800",
+        "alt": "Document Evidence"
+      },
+      "logo_texture": {
+        "url": "https://images.unsplash.com/photo-1632249266245-01221aa20f62?w=800",
+        "alt": "Abstract Brand Texture"
+      }
+    },
+    "icons": {
+      "library": "lucide-react",
+      "style": "Stroke width 1.5px or 2px. Size 16px (w-4 h-4) for UI, 20px (w-5 h-5) for Nav.",
+      "mapped_icons": {
+        "dashboard": "LayoutDashboard",
+        "obligations": "Scale",
+        "gaps": "AlertCircle",
+        "tasks": "CheckSquare",
+        "evidence": "FileText",
+        "settings": "Settings",
+        "users": "Users",
+        "download": "Download",
+        "upload": "Upload",
+        "search": "Search",
+        "filter": "Filter",
+        "chevron_down": "ChevronDown",
+        "check": "Check",
+        "x": "X"
+      }
+    }
+  },
+  "implementation_instructions": {
+    "step_1_setup": "Update tailwind.config.js with the detailed color palette. Add 'Plus Jakarta Sans' and 'JetBrains Mono' to index.css imports.",
+    "step_2_components": "Customize shadcn components. Force squared/slightly rounded corners (rounded-md). Remove default 'ring' focus styles and replace with 'ring-2 ring-blue-500/20'.",
+    "step_3_layout": "Build the AppShell with a fixed Sidebar (Left) and a sticky Topbar. The main content area should have 'bg-[#F4F6FA]' (secondary background) to differentiate from white cards.",
+    "step_4_dashboard": "Implement the 'Governance Overview'. Use 'recharts' for the Compliance Score Circle (Donut Chart).",
+    "step_5_tables": "The 'Obligation Mapping' view is the core. It needs a high-density Data Table. Use 'tanstack-table' logic if complex, or simple map for MVP. MUST have sticky header.",
+    "specific_rules": [
+      "NO GRADIENTS allowed anywhere.",
+      "NO SHADOWS on inputs, only borders.",
+      "Status indicators must use the 'dot' pattern (colored w-2 h-2 rounded-full) + text label.",
+      "All 'Card' components in the dashboard must have a 'Header' section with a bottom border."
+    ]
+  },
+  "universal_guidelines": [
+    "You tend to converge toward generic, 'on distribution' outputs. Avoid this.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur) ONLY for sticky headers/overlays.",
+    "You MUST NOT apply universal transition. Eg: transition: all.",
+    "You MUST NOT center align the app container.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations.",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠 for icons.",
+    "Every interaction needs micro-animations - hover states, transitions.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Main agent relies on these image URLs. Missing categories = main agent will use placeholder text which is FORBIDDEN.",
+    "Prioritize using pre-existing components from src/components/ui when applicable.",
+    "Components MUST use named exports.",
+    "Pages MUST use default exports.",
+    "Use sonner for toasts.",
+    "All interactive and key informational elements MUST include a data-testid attribute."
+  ]
+}
