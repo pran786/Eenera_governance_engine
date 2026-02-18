@@ -28,7 +28,7 @@ class EeneraAPITester:
             'task_ids': []
         }
 
-    def run_test(self, name, method, endpoint, expected_status, data=None, files=None):
+    def run_test(self, name, method, endpoint, expected_status, data=None, files=None, needs_auth=True):
         """Run a single API test"""
         url = f"{self.base_url}/api/{endpoint}"
         headers = {}
@@ -39,8 +39,12 @@ class EeneraAPITester:
         else:
             headers['Content-Type'] = 'application/json'
         
-        if self.token:
-            headers['Authorization'] = f'Bearer {self.token}'
+        # Add token as query parameter if needed
+        if self.token and needs_auth:
+            if '?' in url:
+                url += f'&authorization=Bearer {self.token}'
+            else:
+                url += f'?authorization=Bearer {self.token}'
 
         self.tests_run += 1
         print(f"\n🔍 Test {self.tests_run}: {name}")
@@ -51,10 +55,22 @@ class EeneraAPITester:
                 response = requests.get(url, headers=headers, timeout=30)
             elif method == 'POST':
                 if files:
+                    if self.token and needs_auth:
+                        if data is None:
+                            data = {}
+                        data['authorization'] = f'Bearer {self.token}'
                     response = requests.post(url, files=files, data=data, headers=headers, timeout=30)
                 else:
+                    if self.token and needs_auth:
+                        if data is None:
+                            data = {}
+                        data['authorization'] = f'Bearer {self.token}'
                     response = requests.post(url, json=data, headers=headers, timeout=30)
             elif method == 'PUT':
+                if self.token and needs_auth:
+                    if data is None:
+                        data = {}
+                    data['authorization'] = f'Bearer {self.token}'
                 response = requests.put(url, json=data, headers=headers, timeout=30)
             elif method == 'DELETE':
                 response = requests.delete(url, headers=headers, timeout=30)
