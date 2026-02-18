@@ -142,11 +142,26 @@ export default function DashboardPage() {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!currentAssessment) return;
-    const url = `${process.env.REACT_APP_BACKEND_URL}/api/reports/${currentAssessment.id}/pdf`;
-    const token = localStorage.getItem('eenera_token');
-    window.open(`${url}?authorization=Bearer ${token}`, '_blank');
+    try {
+      const token = localStorage.getItem('eenera_token');
+      const response = await fetch(
+        `${process.env.REACT_APP_BACKEND_URL}/api/reports/${currentAssessment.id}/pdf`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!response.ok) throw new Error('PDF generation failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `eenera-report-${currentAssessment.id.slice(0, 8)}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success('PDF downloaded');
+    } catch (e) {
+      toast.error('Failed to download PDF');
+    }
   };
 
   const scoreData = score ? [
