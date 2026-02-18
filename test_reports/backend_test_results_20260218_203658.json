@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-02-18T20:36:58.605215",
+  "base_url": "https://governance-engine-2.preview.emergentagent.com",
+  "total_tests": 28,
+  "passed_tests": 28,
+  "failed_tests": [],
+  "success_rate": 100.0,
+  "created_resources": {
+    "org_id": "8e02d27f-554c-4fc9-a771-678f623a41c4",
+    "framework_id": "e145a1eb-4879-4664-8354-9f16116dc763",
+    "version_id": "5b8bdbc7-cf8a-4507-adcd-a43323e3e6bd",
+    "assessment_id": "9fa5ebfb-b119-4916-81ae-1a965e6611a1",
+    "document_id": "4abe9ced-3bec-4c6a-8ce0-ddd017ba4da2",
+    "gap_ids": [],
+    "task_ids": [
+      "45b6c758-d254-4fdd-b40f-e76907685bbf"
+    ]
+  }
+}
