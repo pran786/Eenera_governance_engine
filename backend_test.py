@@ -206,7 +206,8 @@ class EeneraAPITester:
                 "List Obligations",
                 "GET",
                 f"frameworks/{self.created_resources['version_id']}/obligations",
-                200
+                200,
+                needs_auth=False
             )
             
             if success and response:
