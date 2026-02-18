@@ -183,7 +183,8 @@ class EeneraAPITester:
             "List Frameworks",
             "GET",
             "frameworks",
-            200
+            200,
+            needs_auth=False
         )
         
         if success and response:
