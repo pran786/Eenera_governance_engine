@@ -123,7 +123,8 @@ class EeneraAPITester:
             "POST",
             "auth/register",
             200,
-            data=test_user
+            data=test_user,
+            needs_auth=False
         )
         
         if success and 'token' in response:
