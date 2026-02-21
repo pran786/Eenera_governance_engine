@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 class EeneraAPITester:
-    def __init__(self, base_url="https://governance-engine-2.preview.emergentagent.com"):
+    def __init__(self, base_url="http://localhost:8000"):
         self.base_url = base_url
         self.token = None
         self.tests_run = 0
@@ -39,12 +39,8 @@ class EeneraAPITester:
         else:
             headers['Content-Type'] = 'application/json'
         
-        # Add token as query parameter if needed
         if self.token and needs_auth:
-            if '?' in url:
-                url += f'&authorization=Bearer {self.token}'
-            else:
-                url += f'?authorization=Bearer {self.token}'
+            headers['Authorization'] = f'Bearer {self.token}'
 
         self.tests_run += 1
         print(f"\n🔍 Test {self.tests_run}: {name}")
@@ -55,22 +51,10 @@ class EeneraAPITester:
                 response = requests.get(url, headers=headers, timeout=30)
             elif method == 'POST':
                 if files:
-                    if self.token and needs_auth:
-                        if data is None:
-                            data = {}
-                        data['authorization'] = f'Bearer {self.token}'
                     response = requests.post(url, files=files, data=data, headers=headers, timeout=30)
                 else:
-                    if self.token and needs_auth:
-                        if data is None:
-                            data = {}
-                        data['authorization'] = f'Bearer {self.token}'
                     response = requests.post(url, json=data, headers=headers, timeout=30)
             elif method == 'PUT':
-                if self.token and needs_auth:
-                    if data is None:
-                        data = {}
-                    data['authorization'] = f'Bearer {self.token}'
                 response = requests.put(url, json=data, headers=headers, timeout=30)
             elif method == 'DELETE':
                 response = requests.delete(url, headers=headers, timeout=30)

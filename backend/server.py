@@ -17,6 +17,7 @@ import uuid
 from datetime import datetime, timezone
 import jwt
 import bcrypt
+import litellm
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -337,7 +338,10 @@ async def seed_data(authorization: str = Header(None)):
 @api_router.get("/organisations")
 async def list_organisations(authorization: str = Header(None)):
     user = extract_token(authorization)
-    orgs = await db.organisations.find({}, {"_id": 0}).to_list(100)
+    query = {}
+    if user.get("role") != "admin":
+        query["created_by"] = user["user_id"]
+    orgs = await db.organisations.find(query, {"_id": 0}).to_list(100)
     return orgs
 
 @api_router.post("/organisations")
@@ -477,8 +481,20 @@ async def create_assessment(data: AssessmentCreate, authorization: str = Header(
 async def list_assessments(org_id: str = None, authorization: str = Header(None)):
     user = extract_token(authorization)
     query = {}
+    
+    # If org_id is provided, verify ownership unless admin
     if org_id:
+        if user.get("role") != "admin":
+            org = await db.organisations.find_one({"id": org_id}, {"_id": 0})
+            if not org or org.get("created_by") != user["user_id"]:
+                raise HTTPException(status_code=403, detail="Not authorized to access this organization's assessments")
         query["org_id"] = org_id
+    elif user.get("role") != "admin":
+        # If no org_id, only show assessments for user's organizations
+        user_orgs = await db.organisations.find({"created_by": user["user_id"]}, {"_id": 0}).to_list(100)
+        user_org_ids = [o["id"] for o in user_orgs]
+        query["org_id"] = {"$in": user_org_ids}
+        
     assessments = await db.assessments.find(query, {"_id": 0}).to_list(100)
     return assessments
 
@@ -723,45 +739,60 @@ async def ai_analyze(assessment_id: str, authorization: str = Header(None)):
     
     prompt = f"""Analyze this privacy policy against GDPR compliance controls.
 
-DOCUMENT:
-{doc_text[:3000]}
+            DOCUMENT:
+            {doc_text[:3000]}
 
-CONTROLS TO EVALUATE:
-{controls_text}
+            CONTROLS TO EVALUATE:
+            {controls_text}
 
-For each control, respond in JSON format:
-[{{"control_ref": "XX-001", "status": "MET|PARTIAL|NOT_MET", "confidence": 0.0-1.0, "rationale": "brief explanation"}}]
+            For each control, respond in JSON format:
+            [{{"control_ref": "XX-001", "status": "MET|PARTIAL|NOT_MET", "confidence": 0.0-1.0, "rationale": "brief explanation"}}]
 
-Be strict. If the document is vague or uses placeholders like [COMPANY NAME], mark as PARTIAL or NOT_MET."""
+            Be strict. If the document is vague or uses placeholders like [COMPANY NAME], mark as PARTIAL or NOT_MET."""
 
     try:
-        llm_key = os.environ.get('EMERGENT_LLM_KEY', '')
-        if not llm_key:
-            return {"message": "No LLM API key configured. Set EMERGENT_LLM_KEY in environment.", "analyzed": 0}
+        # Get configuration from env
+        provider = os.environ.get('LLM_PROVIDER', 'openai').lower()
+        model_name = os.environ.get('LLM_MODEL', 'gpt-4')
+        api_key = os.environ.get('OPENAI_API_KEY')
         
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        if provider == 'openai':
+            model = f"openai/{model_name}"
+        elif provider == 'gemini':
+            model = f"gemini/{model_name}"
+            api_key = os.environ.get('GEMINI_API_KEY')
+        elif provider == 'ollama':
+            model = f"ollama/{model_name}"
+            litellm.api_base = os.environ.get('OLLAMA_URL', 'http://localhost:11434')
+        else:
+            model = model_name # Default literal
+            
+        if not api_key and provider != 'ollama':
+            return {"message": f"API key for {provider} not configured.", "analyzed": 0}
+
+        messages = [
+            {"role": "system", "content": "You are a GDPR compliance analyst. Respond only with valid JSON arrays."},
+            {"role": "user", "content": prompt}
+        ]
         
-        chat = LlmChat(
-            api_key=llm_key,
-            session_id=f"eenera-{assessment_id}",
-            system_message="You are a GDPR compliance analyst. Respond only with valid JSON arrays."
+        response = litellm.completion(
+            model=model,
+            messages=messages,
+            api_key=api_key,
+            response_format={ "type": "json_object" } if provider == 'openai' else None
         )
         
-        provider = os.environ.get('LLM_PROVIDER', 'openai')
-        model = os.environ.get('LLM_MODEL', 'gpt-5.2')
-        chat.with_model(provider, model)
-        
-        response = await chat.send_message(UserMessage(text=prompt))
+        content = response.choices[0].message.content
         
         try:
-            json_match = re.search(r'\[.*\]', response, re.DOTALL)
+            json_match = re.search(r'\[.*\]', content, re.DOTALL)
             if json_match:
                 results = json.loads(json_match.group())
             else:
-                results = json.loads(response)
+                results = json.loads(content)
         except json.JSONDecodeError:
-            logger.warning(f"Failed to parse AI response: {response[:200]}")
-            return {"message": "AI analysis completed but response parsing failed", "analyzed": 0, "raw": response[:500]}
+            logger.warning(f"Failed to parse AI response: {content[:200]}")
+            return {"message": "AI analysis completed but response parsing failed", "analyzed": 0, "raw": content[:500]}
         
         updated = 0
         for r in results:
@@ -958,104 +989,150 @@ async def export_pdf(assessment_id: str):
     
     controls_html = ""
     for ca in report["control_assessments"]:
-        status_color = "#10B981" if ca["status"] == "MET" else "#F59E0B" if ca["status"] == "PARTIAL" else "#EF4444" if ca["status"] == "NOT_MET" else "#94A3B8"
+        s_cls = "status-" + ca["status"].lower().replace("_", "-")
         controls_html += f"""<tr>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-family:monospace;font-size:12px;">{ca.get('control_ref','')}</td>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-size:12px;">{ca['statement'][:80]}</td>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;"><span style="background:{status_color};color:white;padding:2px 8px;border-radius:4px;font-size:11px;">{ca['status']}</span></td>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-size:12px;">{ca['confidence']}</td>
+            <td class="font-mono">{ca.get('control_ref','')}</td>
+            <td>{ca['statement'][:100]}...</td>
+            <td><span class="badge {s_cls}">{ca['status']}</span></td>
+            <td class="font-mono">{ca['confidence']:.2f}</td>
         </tr>"""
     
     gaps_html = ""
     for i, gap in enumerate(report["gaps"]):
-        sev_color = "#EF4444" if gap.get("severity") == "high" else "#F59E0B" if gap.get("severity") == "medium" else "#3B82F6"
+        v_cls = "severity-" + gap.get("severity", "medium").lower()
         gaps_html += f"""<tr>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-size:12px;">GAP-{i+1:03d}</td>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-size:12px;">{gap.get('obligation_title','')}</td>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;"><span style="background:{sev_color};color:white;padding:2px 8px;border-radius:4px;font-size:11px;">{gap.get('severity','')}</span></td>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-size:12px;">{gap.get('description','')[:60]}</td>
+            <td class="font-mono">GAP-{i+1:03d}</td>
+            <td>{gap.get('obligation_title','') or gap.get('theme','')}</td>
+            <td><span class="badge {v_cls}">{gap.get('severity','').upper()}</span></td>
+            <td>{gap.get('description','')}</td>
         </tr>"""
     
     tasks_html = ""
     for task in report["tasks"]:
         tasks_html += f"""<tr>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-size:12px;">{task.get('description','')[:60]}</td>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-size:12px;">{task.get('assigned_to','')}</td>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-size:12px;">{task.get('status','')}</td>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-size:12px;">{task.get('due_date','')}</td>
-        </tr>"""
-    
-    approvals_html = ""
-    for appr in report["approvals"]:
-        approvals_html += f"""<tr>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-size:12px;">{appr.get('approver_name','')}</td>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-size:12px;">{appr.get('role','')}</td>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-size:12px;">{appr.get('created_at','')[:10]}</td>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-size:12px;">{appr.get('action','')}</td>
-        </tr>"""
-    
-    evidence_html = ""
-    for ev in report["evidence"]:
-        evidence_html += f"""<tr>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-size:12px;">{ev.get('id','')[:12]}</td>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-size:12px;">{ev.get('source','')}</td>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-family:monospace;font-size:10px;">{ev.get('hash','')[:24]}...</td>
+            <td>{task.get('description','')}</td>
+            <td>{task.get('assigned_to','')}</td>
+            <td><span class="badge" style="background:#64748b;">{task.get('status','').upper()}</span></td>
+            <td class="font-mono">{task.get('due_date','')}</td>
         </tr>"""
     
     theme_html = ""
     for t_name, t_data in score.get("themes", {}).items():
-        t_color = "#10B981" if t_data["band"] == "Green" else "#F59E0B" if t_data["band"] == "Amber" else "#EF4444"
         theme_html += f"""<tr>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-size:13px;">{t_name}</td>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;font-size:13px;">{t_data['score']}%</td>
-            <td style="padding:8px;border-bottom:1px solid #E2E8F0;"><span style="background:{t_color};color:white;padding:2px 8px;border-radius:4px;font-size:11px;">{t_data['band']}</span></td>
+            <td style="font-weight:600;">{t_name}</td>
+            <td class="font-mono">{t_data['score']}%</td>
+            <td><span class="badge status-{t_data['band'].lower()}">{t_data['band']}</span></td>
+            <td>{t_data.get('met',0)}</td>
+            <td>{t_data.get('partial',0)}</td>
+            <td>{t_data.get('not_met',0)}</td>
         </tr>"""
     
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <style>
-body {{ font-family: 'Helvetica Neue', Arial, sans-serif; color: #111827; margin: 40px; line-height: 1.6; }}
-h1 {{ color: #0B1F3B; font-size: 24px; border-bottom: 3px solid #1E4FFF; padding-bottom: 8px; }}
-h2 {{ color: #0B1F3B; font-size: 18px; margin-top: 30px; }}
-table {{ width: 100%; border-collapse: collapse; margin: 15px 0; }}
-th {{ background: #F4F6FA; padding: 10px 8px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748B; border-bottom: 2px solid #E2E8F0; }}
-.score-box {{ text-align: center; padding: 30px; background: #F4F6FA; border-radius: 8px; margin: 20px 0; }}
-.score-num {{ font-size: 48px; font-weight: 700; color: {band_color}; }}
-.disclaimer {{ font-size: 11px; color: #94A3B8; margin-top: 40px; padding-top: 20px; border-top: 1px solid #E2E8F0; }}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&family=Plus+Jakarta+Sans:wght@700&display=swap');
+body {{ font-family: 'Inter', sans-serif; color: #1e293b; margin: 0; padding: 40px; line-height: 1.5; background: #fff; }}
+.header {{ border-bottom: 2px solid #0f172a; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }}
+.header-left h1 {{ font-family: 'Plus Jakarta Sans', sans-serif; color: #0f172a; font-size: 24px; margin: 0; text-transform: uppercase; letter-spacing: 1px; }}
+.header-right {{ text-align: right; color: #64748b; font-size: 12px; }}
+h2 {{ font-family: 'Plus Jakarta Sans', sans-serif; color: #0f172a; font-size: 18px; margin-top: 40px; margin-bottom: 16px; border-left: 4px solid #3b82f6; padding-left: 12px; }}
+.summary-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }}
+.summary-card {{ background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; text-align: center; }}
+.summary-label {{ font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 600; margin-bottom: 4px; }}
+.summary-value {{ font-size: 24px; font-weight: 700; color: #0f172a; }}
+.score-value {{ color: {band_color}; }}
+table {{ width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 12px; }}
+th {{ background: #f1f5f9; padding: 12px 8px; text-align: left; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0; text-transform: uppercase; font-size: 10px; }}
+td {{ padding: 10px 8px; border-bottom: 1px solid #f1f5f9; color: #334155; }}
+.badge {{ padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; color: white; display: inline-block; }}
+.status-met {{ background: #10b981; }}
+.status-partial {{ background: #f59e0b; }}
+.status-not-met {{ background: #ef4444; }}
+.status-unknown {{ background: #94a3b8; }}
+.severity-high {{ background: #ef4444; }}
+.severity-medium {{ background: #f59e0b; }}
+.severity-low {{ background: #3b82f6; }}
+.font-mono {{ font-family: 'JetBrains Mono', monospace; font-size: 11px; }}
+.disclaimer {{ font-size: 10px; color: #94a3b8; margin-top: 60px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-style: italic; }}
 </style></head><body>
-<div style="text-align:center;margin-bottom:40px;">
-<h1 style="border:none;font-size:28px;">EENERA GOVERNANCE ASSESSMENT REPORT</h1>
-<p style="color:#64748B;">Organisation: {org_name} | Framework: {fw_name} v{fw_ver}</p>
-<p style="color:#64748B;">Assessment Date: {report['date'][:10]} | ID: {assessment_id[:12]}...</p>
+<div class="header">
+    <div class="header-left">
+        <div style="font-size: 10px; color: #3b82f6; font-weight: 700; margin-bottom: 4px;">OFFICIAL ASSESSMENT</div>
+        <h1>Eenera Governance Report</h1>
+    </div>
+    <div class="header-right">
+        <div>Generated: {report['date'][:10]}</div>
+        <div>ID: {assessment_id[:12]}</div>
+    </div>
+</div>
+
+<div style="background: #0f172a; color: white; padding: 24px; border-radius: 8px; margin-bottom: 30px;">
+    <div style="font-size: 12px; opacity: 0.7; margin-bottom: 8px;">ORGANISATION</div>
+    <div style="font-size: 20px; font-weight: 700; margin-bottom: 16px;">{org_name}</div>
+    <div style="display: flex; gap: 40px;">
+        <div>
+            <div style="font-size: 10px; opacity: 0.7;">FRAMEWORK</div>
+            <div style="font-size: 14px; font-weight: 500;">{fw_name} v{fw_ver}</div>
+        </div>
+        <div>
+            <div style="font-size: 10px; opacity: 0.7;">OVERALL SCORE</div>
+            <div style="font-size: 14px; font-weight: 700; color: {band_color};">{score['overall']}% ({score['band']})</div>
+        </div>
+    </div>
 </div>
 
 <h2>1. Executive Summary</h2>
-<div class="score-box">
-<div class="score-num">{score['overall']}%</div>
-<div style="font-size:14px;color:#64748B;">Overall Governance Score — <span style="color:{band_color};font-weight:600;">{score['band']}</span></div>
+<p style="font-size: 13px; color: #475569;">
+    This report provides a comprehensive evaluation of <strong>{org_name}'s</strong> governance and compliance standing against the {fw_name} framework. 
+    The assessment identified a current compliance score of <strong style="color: {band_color};">{score['overall']}%</strong> with {score['coverage']}% control coverage.
+</p>
+
+<div class="summary-grid">
+    <div class="summary-card">
+        <div class="summary-label">High Gaps</div>
+        <div class="summary-value" style="color: #ef4444;">{report['summary']['high_risk_gaps']}</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">Medium Gaps</div>
+        <div class="summary-value" style="color: #f59e0b;">{report['summary']['medium_risk_gaps']}</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">Remediation Tasks</div>
+        <div class="summary-value">{len(report['tasks'])}</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">Evidence Items</div>
+        <div class="summary-value">{len(report['evidence'])}</div>
+    </div>
 </div>
-<p>Coverage: {score['coverage']}% | High-Risk Gaps: {report['summary']['high_risk_gaps']} | Medium-Risk Gaps: {report['summary']['medium_risk_gaps']} | Low-Risk Gaps: {report['summary']['low_risk_gaps']}</p>
-<p>This assessment evaluates the organisation's policy documentation against structured UK ICO regulatory obligations. The analysis identifies areas of compliance strength and remediation opportunities.</p>
 
-<h2>2. Score Breakdown</h2>
-<table><tr><th>Theme</th><th>Score</th><th>Status</th></tr>{theme_html}</table>
+<h2>2. Theme Breakdown</h2>
+<table>
+    <thead><tr><th>Theme</th><th>Score</th><th>Status</th><th>Met</th><th>Partial</th><th>Not Met</th></tr></thead>
+    <tbody>{theme_html}</tbody>
+</table>
 
-<h2>3. Control Assessment Table</h2>
-<table><tr><th>Control ID</th><th>Statement</th><th>Status</th><th>Confidence</th></tr>{controls_html}</table>
+<h2>3. Detailed Control Assessment</h2>
+<table>
+    <thead><tr><th>ID</th><th>Control Statement</th><th>Status</th><th>Confidence</th></tr></thead>
+    <tbody>{controls_html}</tbody>
+</table>
 
-<h2>4. Identified Gaps</h2>
-<table><tr><th>Gap ID</th><th>Obligation</th><th>Severity</th><th>Description</th></tr>{gaps_html}</table>
+<h2>4. Identified Gaps & Risks</h2>
+<table>
+    <thead><tr><th>Ref</th><th>Obligation / Theme</th><th>Severity</th><th>Issue Description</th></tr></thead>
+    <tbody>{gaps_html}</tbody>
+</table>
 
-<h2>5. Remediation Tasks</h2>
-<table><tr><th>Task</th><th>Owner</th><th>Status</th><th>Due Date</th></tr>{tasks_html}</table>
+<h2>5. Required Actions</h2>
+<table>
+    <thead><tr><th>Remediation Task</th><th>Assigned To</th><th>Status</th><th>Due Date</th></tr></thead>
+    <tbody>{tasks_html}</tbody>
+</table>
 
-<h2>6. Evidence Index</h2>
-<table><tr><th>Evidence ID</th><th>Source Document</th><th>Hash</th></tr>{evidence_html}</table>
-
-<h2>7. Approval Log</h2>
-<table><tr><th>Approver</th><th>Role</th><th>Date</th><th>Action</th></tr>{approvals_html}</table>
-
-<p class="disclaimer">This report reflects automated and manual evaluation of uploaded documentation. It does not constitute legal advice.</p>
+<div class="disclaimer">
+    CONFIDENTIAL: This report contains sensitive organizational data. It reflects automated evaluation of provided documentation and does not constitute formal legal advice.
+</div>
 </body></html>"""
     
     from weasyprint import HTML
